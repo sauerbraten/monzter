@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -21,7 +20,7 @@ type Crawler struct {
 	limiter  *rate.Limiter
 }
 
-func NewCrawler(link string, maxDepth int, limiter *rate.Limiter) (*Crawler, error) {
+func NewCrawler(link string, maxDepth int, maxReqsPerSecond float64) (*Crawler, error) {
 	root, err := url.Parse(link)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to parse %s", link)
@@ -38,7 +37,9 @@ func NewCrawler(link string, maxDepth int, limiter *rate.Limiter) (*Crawler, err
 		},
 		root:     root,
 		maxDepth: maxDepth,
-		limiter:  limiter,
+		// the following line creates a limiter with burst = 1
+		// burst of 1 is fine; we never use limiter.*N methods
+		limiter: rate.NewLimiter(rate.Limit(maxReqsPerSecond), 1),
 	}, nil
 }
 
@@ -70,9 +71,6 @@ func (c *Crawler) crawl(u *url.URL, depth int) (LinkTree, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "error while waiting to be allowed to crawl %s", u.String())
 	}
-
-	// todo: remove
-	fmt.Println("crawling", u, "at depth", depth)
 
 	page, err := c.fetchPage(u.String())
 	if err != nil {
@@ -151,9 +149,16 @@ func (c *Crawler) findLinksInPage(page io.Reader) (links []string, err error) {
 
 	walkLinks(doc, func(n *html.Node) {
 		for _, attr := range n.Attr {
-			if attr.Key == "href" && !seenOnPage.EnsureContains(attr.Val) {
-				links = append(links, attr.Val)
-				break
+			if attr.Key == "href" {
+				href, err := url.Parse(attr.Val)
+				if err != nil {
+					// ignore malformed links
+					return
+				}
+				if !seenOnPage.EnsureContains(urlWithoutScheme(href)) {
+					links = append(links, attr.Val)
+					return
+				}
 			}
 		}
 	})

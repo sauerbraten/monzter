@@ -4,8 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-
-	"golang.org/x/time/rate"
 )
 
 type configuration struct {
@@ -37,11 +35,7 @@ func parseArgs() *configuration {
 func main() {
 	config := parseArgs()
 
-	// the following line creates a limiter with burst = 1
-	// burst of 1 is fine; we never use limiter.*N methods
-	limiter := rate.NewLimiter(rate.Limit(config.requestsPerSecond), 1)
-
-	c, err := NewCrawler(config.entrypoint, config.maxDepth, limiter)
+	c, err := NewCrawler(config.entrypoint, config.maxDepth, config.requestsPerSecond)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
