@@ -22,8 +22,6 @@ type Crawler struct {
 	limiter  *rate.Limiter
 }
 
-// NewCrawler returns a crawler ready to crawl the page at the specified link,
-// limited to the specified maximum depth and outgoing request rate.
 func NewCrawler(link string, maxDepth int, maxReqsPerSecond float64) (*Crawler, error) {
 	root, err := url.Parse(link)
 	if err != nil {
@@ -51,19 +49,14 @@ func NewCrawler(link string, maxDepth int, maxReqsPerSecond float64) (*Crawler, 
 	}, nil
 }
 
-// Run returns link tree found on the page specified by c.root (= the link passed
-// to NewCrawler). Run recursively walks the page tree, following only links with
-// the same hostname as the link passed into NewCrawler, to the maximum depth and
-// with the maximum outgoing request rate configured in NewCrawler.
+// Run returns the link tree found on the page specified by c.root.
 func (c *Crawler) Run() (URLTree, error) {
 	c.visited.EnsureContains(c.root)
 	return c.crawl(c.root, 0)
 }
 
-// crawl returns the link tree found on the page specified by pageURL. crawl recursively
-// walks the page tree, following only links with the same hostname as c.root, and only
-// to the maximum depth configured in c.maxDepth. The number of outgoing requests is
-// limited by c.limiter.
+// crawl returns the link tree found on the page specified by pageURL.
+// crawl uses recursion, limited by c.maxDepth.
 func (c *Crawler) crawl(pageURL *url.URL, depth int) (URLTree, error) {
 	// fmt.Println("crawling", pageURL)
 
@@ -118,8 +111,7 @@ func (c *Crawler) crawl(pageURL *url.URL, depth int) (URLTree, error) {
 }
 
 // parseToAbsURL parses the provided string as URL and if necessary
-// resolves it to an absolute URL using c.root as base. parseToAbsURL
-// also ensures the returned URL has a non-empty path.
+// resolves it to an absolute URL using c.root as base.
 func parseToAbsURL(href string, base *url.URL) (*url.URL, error) {
 	parsed, err := url.Parse(href)
 	if err != nil {
@@ -150,8 +142,8 @@ func (c *Crawler) fetch(pageURL *url.URL) (io.ReadCloser, error) {
 	return resp.Body, nil
 }
 
-// uniqueLinksInPage parses the contents of page as HTML and returns all
-// unique URLs found in href attributes of all <a> tags in the HTML tree.
+// uniqueLinksInPage parses page and returns all URLs (deduplicated)
+// found in href attributes of all <a> tags in the HTML tree.
 func (c *Crawler) uniqueLinksInPage(page io.Reader, pageURL *url.URL) ([]*url.URL, error) {
 	doc, err := html.Parse(page)
 	if err != nil {

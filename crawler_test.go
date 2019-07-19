@@ -9,9 +9,9 @@ import (
 	"testing"
 )
 
-// setupServer starts a httptest.Server and uses setupRoutes to configure routing. It
-// returns the servers base URL as scheme and host, as well as a function to stop the
-// server after testing finished.
+// setupServer starts a httptest.Server and uses setupRoutes to configure routing.
+// setupServer returns the servers base URL as scheme and host, as well as a function
+// to stop the server after testing finished.
 func setupServer(setupRoutes func(setupRoute func(pattern string, links []string))) (scheme, host string, tearDown func()) {
 	mux := http.NewServeMux()
 	ts := httptest.NewServer(mux)
