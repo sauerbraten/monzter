@@ -55,32 +55,31 @@ func TestCrawler(t *testing.T) {
 		expected         string
 	}{
 		{
-			name: "relative links are crawled",
+			name: "relative links",
 			setupRoutes: func(setupRoute func(pattern string, links []string)) {
-				setupRoute("/entry", []string{"/foo", "/bar", "/baz"})
-				setupRoute("/foo", []string{})
-				setupRoute("/bar", []string{})
-				setupRoute("/baz", []string{"/foo", "/bar"})
+				setupRoute("/entry", []string{"/foo/bar"})
+				setupRoute("/foo/bar", []string{"baz"})
+				setupRoute("/foo/baz", []string{"../../baz"})
+				setupRoute("/baz", []string{"/foo", "foo/bar"})
 			},
 			maxDepth:         5,
 			maxReqsPerSecond: 100.0,
-			expected: `- {base}/bar
-- {base}/baz:
-  - {base}/bar
-  - {base}/foo
-- {base}/foo
+			expected: `{base}/foo/bar
+  {base}/foo/baz
+    {base}/baz
+      {base}/foo
+      {base}/foo/bar
 `,
 		},
 		{
 			name: "equivalent relative and absolute links are only listed once",
 			setupRoutes: func(setupRoute func(pattern string, links []string)) {
 				setupRoute("/entry", []string{"/foo", "{base}/foo"})
-				setupRoute("/foo", []string{"/bar"})
+				setupRoute("/foo", nil)
 			},
 			maxDepth:         5,
 			maxReqsPerSecond: 100.0,
-			expected: `- {base}/foo:
-  - {base}/bar
+			expected: `{base}/foo
 `,
 		},
 		{
@@ -94,12 +93,12 @@ func TestCrawler(t *testing.T) {
 			},
 			maxDepth:         100,
 			maxReqsPerSecond: 100.0,
-			expected: `- {base}/depth1:
-  - {base}/depth2:
-    - {base}/depth3:
-      - {base}/depth4
-- {base}/depth4:
-  - {base}/entry
+			expected: `{base}/depth1
+  {base}/depth2
+    {base}/depth3
+      {base}/depth4
+        {base}/entry
+{base}/depth4
 `,
 		},
 		{
@@ -115,23 +114,24 @@ func TestCrawler(t *testing.T) {
 			},
 			maxDepth:         2,
 			maxReqsPerSecond: 100.0,
-			expected: `- {base}/depth1:
-  - {base}/depth2
-- {base}/depth4:
-  - {base}/entry
+			expected: `{base}/depth1
+  {base}/depth2
+{base}/depth4
+  {base}/entry
 `,
 		},
 		{
 			name: "external links",
 			setupRoutes: func(setupRoute func(pattern string, links []string)) {
 				setupRoute("/entry", []string{"facebook.com", "http://github.com", "https://google.com/maps", "//www.wikipedia.org"})
+				setupRoute("/facebook.com", nil) // <a href="facebook.com"> is a local link!
 			},
 			maxDepth:         5,
 			maxReqsPerSecond: 100.0,
-			expected: `- {base}/facebook.com
-- http://github.com/
-- {scheme}://www.wikipedia.org/
-- https://google.com/maps
+			expected: `{base}/facebook.com
+http://github.com/
+https://google.com/maps
+{scheme}://www.wikipedia.org/
 `,
 		},
 		{
@@ -146,12 +146,12 @@ func TestCrawler(t *testing.T) {
 			},
 			maxDepth:         5,
 			maxReqsPerSecond: 100.0,
-			expected: `- {base}/depth1:
-  - {base}/depth2:
-    - {base}/depth3:
-      - {base}/depth4:
-        - {base}/depth5
-- {scheme}://facebook.com/
+			expected: `{base}/depth1
+  {base}/depth2
+    {base}/depth3
+      {base}/depth4
+        {base}/depth5
+{scheme}://facebook.com/
 `,
 		},
 		{
@@ -161,7 +161,7 @@ func TestCrawler(t *testing.T) {
 			},
 			maxDepth:         1,
 			maxReqsPerSecond: 100.0,
-			expected: `- {scheme}://google.com/mail
+			expected: `{scheme}://google.com/mail
 `,
 		},
 	}
