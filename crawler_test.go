@@ -14,7 +14,6 @@ import (
 // server after testing finished.
 func setupServer(setupRoutes func(setupRoute func(pattern string, links []string))) (scheme, host string, tearDown func()) {
 	mux := http.NewServeMux()
-
 	ts := httptest.NewServer(mux)
 
 	u, _ := url.Parse(ts.URL)
@@ -43,8 +42,8 @@ func replacePlaceholders(s, scheme, host string) string {
 }
 
 func TestCrawler(t *testing.T) {
-	// test are defined as struct
-	// the links argument passed to setupRout() and the expected output
+	// a test is defined as a struct
+	// the links argument passed to setupRoute() and the expected output
 	// can contain '{scheme}', '{host}' and '{base}' (= '{scheme}://{host}')
 	// as placeholders for the scheme, host, and base URL of the test server
 	tests := []struct {
@@ -54,6 +53,19 @@ func TestCrawler(t *testing.T) {
 		maxReqsPerSecond float64
 		expected         string
 	}{
+		{
+			name: "absolute links",
+			setupRoutes: func(setupRoute func(pattern string, links []string)) {
+				setupRoute("/entry", []string{"{base}/foo"})
+				setupRoute("/foo", []string{"{base}/baz"})
+				setupRoute("/baz", nil)
+			},
+			maxDepth:         5,
+			maxReqsPerSecond: 100.0,
+			expected: `{base}/foo
+  {base}/baz
+`,
+		},
 		{
 			name: "relative links",
 			setupRoutes: func(setupRoute func(pattern string, links []string)) {
@@ -159,9 +171,24 @@ https://google.com/maps
 			setupRoutes: func(setupRoute func(pattern string, links []string)) {
 				setupRoute("/entry", []string{"http://google.com/mail", "https://google.com/mail"})
 			},
-			maxDepth:         1,
+			maxDepth:         100,
 			maxReqsPerSecond: 100.0,
 			expected: `{scheme}://google.com/mail
+`,
+		},
+		{
+			name: "links ending with slash are distinct",
+			setupRoutes: func(setupRoute func(pattern string, links []string)) {
+				setupRoute("/entry", []string{"http://google.com/mail", "http://google.com/mail/", "/bla", "/bla/"})
+				setupRoute("/bla", nil)
+				setupRoute("/bla/", nil)
+			},
+			maxDepth:         100,
+			maxReqsPerSecond: 100.0,
+			expected: `{base}/bla
+{base}/bla/
+{scheme}://google.com/mail
+{scheme}://google.com/mail/
 `,
 		},
 	}
@@ -184,7 +211,7 @@ https://google.com/maps
 		expected := replacePlaceholders(test.expected, scheme, host)
 
 		if output != expected {
-			t.Errorf("test '%s' failed: expected\n%s\nbut got\n%s", test.name, expected, output)
+			t.Errorf("test '%s' failed: expected\n%sbut got\n%s", test.name, expected, output)
 		}
 
 		tearDown()
